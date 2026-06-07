@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* 深色（默认） */
+  --background: #0f0f13;
+  --card: #1a1a24;
+  --card-hover: #22223a;
+  --border: #2a2a3e;
+  --accent: #6d5aff;
+  --accent-light: #8b73ff;
+  --text-primary: #e8e8f0;
+  --text-secondary: #8888aa;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root.light {
+  /* 浅色 */
+  --background: #f6f7fb;
+  --card: #ffffff;
+  --card-hover: #eef0f7;
+  --border: #e3e5ee;
+  --accent: #6d5aff;
+  --accent-light: #5b46e0;
+  --text-primary: #1b1b29;
+  --text-secondary: #6b6b85;
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 2px;
 }
