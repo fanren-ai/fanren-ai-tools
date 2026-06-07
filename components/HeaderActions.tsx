@@ -6,14 +6,30 @@ import { useSyncExternalStore } from "react";
 const FAVORITES_EVENT = "favoriteschange";
 const THEME_EVENT = "themechange";
 
+const EMPTY_IDS: string[] = [];
+
+// useSyncExternalStore 要求快照引用稳定：底层数据未变时必须返回同一引用，
+// 否则会触发无限重渲染（导致内存溢出 / 页面崩溃）。这里按原始字符串缓存。
+let favCacheRaw = "";
+let favCache: string[] = EMPTY_IDS;
+
 function readFavorites(): string[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined") return EMPTY_IDS;
   try {
-    const list = JSON.parse(localStorage.getItem("favorites") || "[]");
-    return Array.isArray(list) ? list.map(String) : [];
+    const raw = localStorage.getItem("favorites") || "[]";
+    if (raw !== favCacheRaw) {
+      favCacheRaw = raw;
+      const list = JSON.parse(raw);
+      favCache = Array.isArray(list) ? list.map(String) : EMPTY_IDS;
+    }
+    return favCache;
   } catch {
-    return [];
+    return EMPTY_IDS;
   }
+}
+
+function getServerFavorites(): string[] {
+  return EMPTY_IDS;
 }
 
 function subscribeFavorites(onStoreChange: () => void) {
@@ -28,7 +44,11 @@ function subscribeFavorites(onStoreChange: () => void) {
 }
 
 export function useFavoriteIds() {
-  return useSyncExternalStore(subscribeFavorites, readFavorites, () => []);
+  return useSyncExternalStore(
+    subscribeFavorites,
+    readFavorites,
+    getServerFavorites
+  );
 }
 
 export function saveFavoriteIds(ids: string[]) {
