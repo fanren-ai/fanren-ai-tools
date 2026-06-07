@@ -403,7 +403,7 @@ export default function Home() {
                 className="font-bold text-sm"
                 style={{ color: "var(--text-primary)" }}
               >
-                凡人修AI
+                凡人修AI工具箱
               </span>
             </div>
             <div className="flex-1 relative max-w-xl">

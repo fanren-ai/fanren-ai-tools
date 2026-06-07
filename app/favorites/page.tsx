@@ -72,7 +72,7 @@ export default function FavoritesPage() {
           <Link href="/" className="flex items-center gap-2 lg:hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/images/logo-mark.png" alt="凡人修AI" width={28} height={28} />
-            <span className="font-bold text-sm">凡人修AI</span>
+            <span className="font-bold text-sm">凡人修AI工具箱</span>
           </Link>
           <div className="flex-1" />
           <ThemeToggle />

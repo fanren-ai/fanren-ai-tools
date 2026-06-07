@@ -128,9 +128,30 @@ export function FavoritesButton() {
   );
 }
 
+export function AiCourseButton() {
+  return (
+    <a
+      href="https://www.fanrenai.cn/"
+      target="_blank"
+      rel="noopener noreferrer"
+      title="AI教程 · 前往凡人修AI首页"
+      className="shrink-0 inline-flex items-center gap-1.5 px-3 h-10 rounded-xl text-sm font-medium transition-colors"
+      style={{
+        backgroundColor: "var(--card)",
+        border: "1px solid var(--border)",
+        color: "var(--text-secondary)",
+      }}
+    >
+      <span>🎓</span>
+      <span className="hidden sm:inline">AI教程</span>
+    </a>
+  );
+}
+
 export default function HeaderActions() {
   return (
     <div className="flex items-center gap-2 shrink-0">
+      <AiCourseButton />
       <FavoritesButton />
       <ThemeToggle />
     </div>

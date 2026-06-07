@@ -46,8 +46,8 @@ export const metadata: Metadata = {
   category: "technology",
 };
 
-// 在水合前根据 localStorage / 系统偏好设置主题，避免首屏闪烁
-const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}if(t==='light'){document.documentElement.classList.add('light');}}catch(e){}})();`;
+// 在水合前设置主题，避免首屏闪烁。默认浅色：除非用户显式选过深色，否则用 light。
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(t!=='dark'){document.documentElement.classList.add('light');}}catch(e){document.documentElement.classList.add('light');}})();`;
 
 // 站点结构化数据（WebSite + 站内搜索）
 const websiteJsonLd = {
