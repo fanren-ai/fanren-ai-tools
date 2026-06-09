@@ -17,20 +17,18 @@ export async function PATCH(
   ctx: RouteContext<"/api/admin/tools/[id]">
 ) {
   const { id } = await ctx.params;
-  const body = (await req.json().catch(() => ({}))) as Partial<Tool> & {
-    category?: string;
-  };
+  const body = (await req.json().catch(() => ({}))) as Partial<Tool>;
 
-  const patch: Partial<Tool> & { category?: string } = {};
+  const patch: Partial<Tool> = {};
   if (typeof body.name === "string") patch.name = body.name.trim().slice(0, 80);
   if (typeof body.description === "string")
     patch.description = body.description.trim().slice(0, 200);
   if (typeof body.url === "string") patch.url = body.url.trim().slice(0, 300);
   if (typeof body.logo === "string") patch.logo = body.logo.trim().slice(0, 300) || undefined;
-  if (typeof body.sub === "string") patch.sub = body.sub || undefined;
+  if (Array.isArray(body.categoryIds)) patch.categoryIds = body.categoryIds.map(String).filter(Boolean);
+  if (Array.isArray(body.subs)) patch.subs = body.subs.map(String).filter(Boolean);
   if (typeof body.hot === "boolean") patch.hot = body.hot;
   if (typeof body.isNew === "boolean") patch.isNew = body.isNew;
-  if (typeof body.category === "string" && body.category) patch.category = body.category;
 
   const updated = await updateTool(id, patch);
   if (!updated) return NextResponse.json({ ok: false, error: "未找到工具" }, { status: 404 });

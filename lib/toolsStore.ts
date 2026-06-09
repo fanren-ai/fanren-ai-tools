@@ -15,95 +15,118 @@ export interface Catalog {
   allTools: Tool[];
 }
 
-// 读取目录：有运行时存储用存储，否则用静态种子
-export async function getCatalog(): Promise<Catalog> {
-  let categories: Category[] = seedCategories;
-  try {
-    const raw = await fs.readFile(STORE_FILE, "utf8");
-    const parsed = JSON.parse(raw) as { categories?: Category[] };
-    if (parsed.categories && Array.isArray(parsed.categories)) {
-      categories = parsed.categories;
-    }
-  } catch {
-    // 文件不存在 → 用种子
-  }
-  return { categories, allTools: categories.flatMap((c) => c.tools) };
+// 静态分类定义（结构固定：id/名称/图标/二级分类）
+const CATEGORY_DEFS = seedCategories.map((c) => ({
+  id: c.id,
+  name: c.name,
+  icon: c.icon,
+  subCategories: c.subCategories,
+}));
+
+// 规范化单个工具：补齐 categoryIds / subs / sub
+function normalize(t: Tool, fallbackCatId?: string): Tool {
+  const categoryIds =
+    t.categoryIds && t.categoryIds.length
+      ? t.categoryIds
+      : fallbackCatId
+      ? [fallbackCatId]
+      : [];
+  const subs = t.subs && t.subs.length ? t.subs : t.sub ? [t.sub] : [];
+  return { ...t, categoryIds, subs, sub: subs[0] };
 }
 
-async function saveCatalog(categories: Category[]): Promise<void> {
+// 种子：把静态嵌套结构拍平为带 categoryIds/subs 的扁平工具列表
+function seedFlat(): Tool[] {
+  const out: Tool[] = [];
+  for (const c of seedCategories) {
+    for (const t of c.tools) out.push(normalize(t, c.id));
+  }
+  return out;
+}
+
+// 读取扁平工具列表（兼容旧的 {categories:[...]} 格式 → 自动迁移）
+async function readTools(): Promise<Tool[]> {
+  try {
+    const raw = await fs.readFile(STORE_FILE, "utf8");
+    const parsed = JSON.parse(raw) as {
+      tools?: Tool[];
+      categories?: Category[];
+    };
+    if (Array.isArray(parsed.tools)) {
+      return parsed.tools.map((t) => normalize(t));
+    }
+    if (Array.isArray(parsed.categories)) {
+      // 旧格式（嵌套）→ 迁移为扁平
+      const out: Tool[] = [];
+      for (const c of parsed.categories) {
+        for (const t of c.tools) out.push(normalize(t, c.id));
+      }
+      return out;
+    }
+  } catch {
+    // 文件不存在
+  }
+  return seedFlat();
+}
+
+function buildCategories(tools: Tool[]): Category[] {
+  return CATEGORY_DEFS.map((def) => ({
+    ...def,
+    tools: tools.filter((t) => (t.categoryIds ?? []).includes(def.id)),
+  }));
+}
+
+export async function getCatalog(): Promise<Catalog> {
+  const tools = await readTools();
+  return { categories: buildCategories(tools), allTools: tools };
+}
+
+async function saveTools(tools: Tool[]): Promise<void> {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(
     STORE_FILE,
-    JSON.stringify({ categories, updatedAt: new Date().toISOString() }),
+    JSON.stringify({ tools, updatedAt: new Date().toISOString() }),
     "utf8"
   );
 }
 
-// 通用修改器：读取 → 修改 categories → 保存
-export async function mutateCatalog(
-  fn: (categories: Category[]) => void | Promise<void>
-): Promise<Catalog> {
-  const { categories } = await getCatalog();
-  await fn(categories);
-  await saveCatalog(categories);
-  return { categories, allTools: categories.flatMap((c) => c.tools) };
-}
-
-// 查找工具所在分类
+// 取工具的主分类（用于详情页 / 列表展示）
 export function findToolCategory(categories: Category[], id: string) {
   return categories.find((c) => c.tools.some((t) => t.id === id));
 }
 
-// 编辑工具字段（可跨分类移动）
+// 编辑工具（含多分类 categoryIds / 多子类 subs）
 export async function updateTool(
   id: string,
-  patch: Partial<Tool> & { category?: string }
+  patch: Partial<Tool>
 ): Promise<Tool | null> {
-  let updated: Tool | null = null;
-  await mutateCatalog((categories) => {
-    const cat = findToolCategory(categories, id);
-    if (!cat) return;
-    const idx = cat.tools.findIndex((t) => t.id === id);
-    if (idx < 0) return;
-    const tool = cat.tools[idx];
-    const { category: newCatId, ...fields } = patch;
-    Object.assign(tool, fields);
-    // 跨分类移动
-    if (newCatId && newCatId !== cat.id) {
-      const target = categories.find((c) => c.id === newCatId);
-      if (target) {
-        cat.tools.splice(idx, 1);
-        target.tools.push(tool);
-      }
-    }
-    updated = tool;
-  });
-  return updated;
+  const tools = await readTools();
+  const t = tools.find((x) => x.id === id);
+  if (!t) return null;
+  Object.assign(t, patch);
+  // 保持规范化
+  const n = normalize(t);
+  t.categoryIds = n.categoryIds;
+  t.subs = n.subs;
+  t.sub = n.sub;
+  await saveTools(tools);
+  return t;
 }
 
-// 删除工具
+// 删除
 export async function deleteTool(id: string): Promise<boolean> {
-  let ok = false;
-  await mutateCatalog((categories) => {
-    const cat = findToolCategory(categories, id);
-    if (!cat) return;
-    cat.tools = cat.tools.filter((t) => t.id !== id);
-    ok = true;
-  });
-  return ok;
+  const tools = await readTools();
+  const next = tools.filter((t) => t.id !== id);
+  if (next.length === tools.length) return false;
+  await saveTools(next);
+  return true;
 }
 
-// 新增工具
-export async function addTool(
-  catId: string,
-  tool: Tool
-): Promise<Tool | null> {
-  let added: Tool | null = null;
-  await mutateCatalog((categories) => {
-    const cat = categories.find((c) => c.id === catId);
-    if (!cat) return;
-    cat.tools.unshift(tool);
-    added = tool;
-  });
-  return added;
+// 新增（tool 自带 categoryIds / subs）
+export async function addTool(tool: Tool): Promise<Tool> {
+  const tools = await readTools();
+  const n = normalize(tool);
+  tools.unshift(n);
+  await saveTools(tools);
+  return n;
 }

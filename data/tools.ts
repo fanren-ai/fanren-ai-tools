@@ -4,7 +4,9 @@ export interface Tool {
   description: string;
   url: string;
   logo?: string;
-  sub?: string;
+  sub?: string; // 主二级分类（= subs[0]，向后兼容）
+  subs?: string[]; // 多个二级分类
+  categoryIds?: string[]; // 多个一级分类（缺省时为其所在分类）
   hot?: boolean;
   isNew?: boolean;
 }

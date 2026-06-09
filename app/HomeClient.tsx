@@ -42,6 +42,11 @@ function LogoIcon({ tool, size }: { tool: Tool; size: number }) {
 type TagFilter = "all" | "hot" | "new";
 const PREVIEW_OPTIONS = [12, 24, Infinity];
 
+// 工具的全部二级分类（兼容旧的单 sub 字段）
+function toolSubs(t: Tool): string[] {
+  return t.subs && t.subs.length ? t.subs : t.sub ? [t.sub] : [];
+}
+
 function readInitialFilters(categories: Category[]) {
   const initial = {
     activeCategory: "all",
@@ -77,12 +82,13 @@ interface SiteConfig {
 
 export default function HomeClient({
   categories,
+  allTools,
   config,
 }: {
   categories: Category[];
+  allTools: Tool[];
   config: SiteConfig;
 }) {
-  const allTools = useMemo(() => categories.flatMap((c) => c.tools), [categories]);
   const [initialFilters] = useState(() => readInitialFilters(categories));
   const [activeCategory, setActiveCategory] = useState<string>(
     initialFilters.activeCategory
@@ -206,7 +212,9 @@ export default function HomeClient({
     const cat = categories.find((c) => c.id === activeCategory);
     if (!cat) return [];
     const tools = cat.tools.filter(
-      (t) => matchTool(t, q) && (activeSub === "all" || t.sub === activeSub)
+      (t) =>
+        matchTool(t, q) &&
+        (activeSub === "all" || toolSubs(t).includes(activeSub))
     );
     return [{ ...cat, tools }];
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,7 +248,7 @@ export default function HomeClient({
     for (const t of currentCat.tools) {
       if (!matchTool(t, q)) continue;
       m.__all += 1;
-      if (t.sub) m[t.sub] = (m[t.sub] || 0) + 1;
+      for (const s of toolSubs(t)) m[s] = (m[s] || 0) + 1;
     }
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps

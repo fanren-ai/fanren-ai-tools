@@ -8,10 +8,9 @@ interface ToolRow {
   description: string;
   url: string;
   logo: string | null;
-  sub: string | null;
-  category: string;
-  categoryId: string;
-  categoryIcon: string;
+  categoryIds: string[];
+  subs: string[];
+  categoryLabel: string;
   hot: boolean;
   isNew: boolean;
 }
@@ -25,10 +24,7 @@ interface Resp {
   categories: Cat[];
 }
 
-type Editing =
-  | { mode: "add" }
-  | { mode: "edit"; row: ToolRow }
-  | null;
+type Editing = { mode: "add" } | { mode: "edit"; row: ToolRow } | null;
 
 export default function AdminTools() {
   const [q, setQ] = useState("");
@@ -87,7 +83,7 @@ export default function AdminTools() {
         </button>
       </div>
       <p className="text-sm mb-5" style={{ color: "var(--text-secondary)" }}>
-        共 {data?.total ?? 0} 个 · 编辑/新增/删除会即时同步到前台（ISR）
+        共 {data?.total ?? 0} 个 · 可多选一级/二级分类 · 编辑后前台即时同步（ISR）
       </p>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -122,7 +118,7 @@ export default function AdminTools() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-sm truncate">{t.name}</div>
-                  <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>{t.categoryIcon} {t.category} · {t.description}</div>
+                  <div className="text-xs truncate" style={{ color: "var(--text-secondary)" }}>{t.categoryLabel} · {t.description}</div>
                 </div>
                 <button onClick={() => toggle(t, "hot")} disabled={busy === t.id} title="切换热门"
                   className="shrink-0 text-xs px-2 py-1 rounded-lg" style={{ backgroundColor: t.hot ? "#ff4d4d22" : "var(--background)", color: t.hot ? "#ff6b6b" : "var(--text-secondary)", border: "1px solid var(--border)" }}>🔥</button>
@@ -145,12 +141,7 @@ export default function AdminTools() {
       )}
 
       {editing && data && (
-        <ToolForm
-          editing={editing}
-          categories={data.categories}
-          onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); }}
-        />
+        <ToolForm editing={editing} categories={data.categories} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />
       )}
     </div>
   );
@@ -168,32 +159,41 @@ function ToolForm({
   onSaved: () => void;
 }) {
   const init = editing.mode === "edit" ? editing.row : null;
-  const [form, setForm] = useState({
-    name: init?.name ?? "",
-    description: init?.description ?? "",
-    url: init?.url ?? "",
-    logo: init?.logo ?? "",
-    category: init?.categoryId ?? categories[0]?.id ?? "",
-    sub: init?.sub ?? "",
-    hot: init?.hot ?? false,
-    isNew: init?.isNew ?? false,
-  });
+  const [name, setName] = useState(init?.name ?? "");
+  const [description, setDescription] = useState(init?.description ?? "");
+  const [url, setUrl] = useState(init?.url ?? "");
+  const [logo, setLogo] = useState(init?.logo ?? "");
+  const [catIds, setCatIds] = useState<string[]>(init?.categoryIds ?? []);
+  const [subs, setSubs] = useState<string[]>(init?.subs ?? []);
+  const [hot, setHot] = useState(init?.hot ?? false);
+  const [isNew, setIsNew] = useState(init?.isNew ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const set = (k: string, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
-  const subs = categories.find((c) => c.id === form.category)?.subCategories ?? [];
+
+  const toggleCat = (id: string) =>
+    setCatIds((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
+  const toggleSub = (id: string) =>
+    setSubs((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  // 仅显示已选一级分类下的二级分类
+  const selectedCats = categories.filter((c) => catIds.includes(c.id));
 
   async function save() {
-    if (!form.name.trim() || !/^https?:\/\//i.test(form.url.trim())) {
+    if (!name.trim() || !/^https?:\/\//i.test(url.trim())) {
       setError("请填写名称和合法的官网链接（http/https）");
+      return;
+    }
+    if (catIds.length === 0) {
+      setError("请至少选择一个一级分类");
       return;
     }
     setSaving(true);
     setError("");
     try {
-      const url = editing.mode === "add" ? "/api/admin/tools" : `/api/admin/tools/${encodeURIComponent(init!.id)}`;
+      const payload = { name, description, url, logo, categoryIds: catIds, subs, hot, isNew };
+      const apiUrl = editing.mode === "add" ? "/api/admin/tools" : `/api/admin/tools/${encodeURIComponent(init!.id)}`;
       const method = editing.mode === "add" ? "POST" : "PATCH";
-      const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const r = await fetch(apiUrl, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const d = await r.json();
       if (!r.ok || !d.ok) { setError(d.error || "保存失败"); setSaving(false); return; }
       onSaved();
@@ -204,32 +204,61 @@ function ToolForm({
   }
 
   const inputStyle = { backgroundColor: "var(--background)", border: "1px solid var(--border)", color: "var(--text-primary)" };
+  const chip = (active: boolean) => ({
+    backgroundColor: active ? "var(--accent)" : "var(--background)",
+    color: active ? "#fff" : "var(--text-secondary)",
+    border: "1px solid " + (active ? "var(--accent)" : "var(--border)"),
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.6)" }} onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-lg rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ backgroundColor: "var(--card)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
         <h3 className="font-bold text-base mb-4">{editing.mode === "add" ? "➕ 新增工具" : "✏️ 编辑工具"}</h3>
         <div className="space-y-3">
-          <Field label="工具名称 *"><input value={form.name} onChange={(e) => set("name", e.target.value)} className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle} /></Field>
-          <Field label="官网链接 *"><input value={form.url} onChange={(e) => set("url", e.target.value)} placeholder="https://..." className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle} /></Field>
-          <Field label="一句话简介"><textarea value={form.description} onChange={(e) => set("description", e.target.value)} maxLength={200} className="w-full h-16 px-3 py-2 rounded-xl text-sm outline-none resize-none" style={inputStyle} /></Field>
-          <Field label="Logo 路径（可选，如 /images/tools/xxx.png）"><input value={form.logo} onChange={(e) => set("logo", e.target.value)} className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle} /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="分类">
-              <select value={form.category} onChange={(e) => { set("category", e.target.value); set("sub", ""); }} className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle}>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-              </select>
-            </Field>
-            <Field label="二级分类">
-              <select value={form.sub} onChange={(e) => set("sub", e.target.value)} className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle}>
-                <option value="">（无）</option>
-                {subs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </Field>
-          </div>
+          <Field label="工具名称 *"><input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle} /></Field>
+          <Field label="官网链接 *"><input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle} /></Field>
+          <Field label="一句话简介"><textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200} className="w-full h-16 px-3 py-2 rounded-xl text-sm outline-none resize-none" style={inputStyle} /></Field>
+          <Field label="Logo 路径（可选）"><input value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="/images/tools/xxx.png" className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={inputStyle} /></Field>
+
+          <Field label={`一级分类（可多选 · 已选 ${catIds.length}）*`}>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((c) => (
+                <button key={c.id} type="button" onClick={() => toggleCat(c.id)}
+                  className="px-2.5 py-1 rounded-full text-xs font-medium" style={chip(catIds.includes(c.id))}>
+                  {c.icon} {c.name}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label={`二级分类（可多选 · 已选 ${subs.length}）`}>
+            {selectedCats.length === 0 ? (
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>请先选择一级分类</p>
+            ) : (
+              <div className="space-y-2">
+                {selectedCats.filter((c) => c.subCategories.length > 0).map((c) => (
+                  <div key={c.id}>
+                    <div className="text-xs mb-1" style={{ color: "var(--text-secondary)" }}>{c.icon} {c.name}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {c.subCategories.map((s) => (
+                        <button key={s.id} type="button" onClick={() => toggleSub(s.id)}
+                          className="px-2.5 py-1 rounded-full text-xs font-medium" style={chip(subs.includes(s.id))}>
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {selectedCats.every((c) => c.subCategories.length === 0) && (
+                  <p className="text-xs" style={{ color: "var(--text-secondary)" }}>所选分类无二级分类</p>
+                )}
+              </div>
+            )}
+          </Field>
+
           <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.hot} onChange={(e) => set("hot", e.target.checked)} /> 🔥 热门</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isNew} onChange={(e) => set("isNew", e.target.checked)} /> 🆕 最新</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={hot} onChange={(e) => setHot(e.target.checked)} /> 🔥 热门</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={isNew} onChange={(e) => setIsNew(e.target.checked)} /> 🆕 最新</label>
           </div>
           {error && <p className="text-sm" style={{ color: "#ff6b6b" }}>⚠️ {error}</p>}
         </div>
@@ -245,7 +274,7 @@ function ToolForm({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-secondary)" }}>{label}</label>
+      <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>{label}</label>
       {children}
     </div>
   );

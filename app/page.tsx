@@ -6,9 +6,11 @@ import { getSiteConfig } from "@/lib/siteConfig";
 export const revalidate = 60;
 
 export default async function Page() {
-  const [{ categories }, config] = await Promise.all([
+  const [{ categories, allTools }, config] = await Promise.all([
     getCatalog(),
     getSiteConfig(),
   ]);
-  return <HomeClient categories={categories} config={config} />;
+  return (
+    <HomeClient categories={categories} allTools={allTools} config={config} />
+  );
 }
