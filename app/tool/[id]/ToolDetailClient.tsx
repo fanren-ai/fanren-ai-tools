@@ -1,9 +1,8 @@
 "use client";
 
-import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { categories, allTools, type Tool } from "@/data/tools";
+import { type Tool } from "@/data/tools";
 import HeaderActions, {
   saveFavoriteIds,
   useFavoriteIds,
@@ -54,16 +53,24 @@ function LogoIcon({ tool, size }: { tool: Tool; size: number }) {
   );
 }
 
-export default function ToolDetailClient() {
-  const params = useParams();
-  const id = decodeURIComponent(
-    Array.isArray(params.id) ? params.id[0] : params.id ?? ""
-  );
-  const tool = allTools.find((t) => t.id === id);
-
-  const category = categories.find((c) =>
-    tool ? c.tools.some((t) => t.id === tool.id) : false
-  );
+export default function ToolDetailClient({
+  tool,
+  categoryId,
+  categoryName,
+  categoryIcon,
+  subName,
+  related,
+}: {
+  tool: Tool;
+  categoryId: string | null;
+  categoryName: string | null;
+  categoryIcon: string | null;
+  subName: string | null;
+  related: Tool[];
+}) {
+  const category = categoryId
+    ? { id: categoryId, name: categoryName ?? "", icon: categoryIcon ?? "" }
+    : null;
 
   // 状态反馈
   const [fbOpen, setFbOpen] = useState(false);
@@ -112,31 +119,6 @@ export default function ToolDetailClient() {
       : [...favoriteIds, tool.id];
     saveFavoriteIds(next);
   }
-
-  if (!tool) {
-    return (
-      <div
-        className="min-h-screen flex flex-col items-center justify-center gap-4"
-        style={{ backgroundColor: "var(--background)", color: "var(--text-primary)" }}
-      >
-        <div className="text-5xl">🔍</div>
-        <p style={{ color: "var(--text-secondary)" }}>未找到该工具</p>
-        <Link
-          href="/"
-          className="px-4 py-2 rounded-xl text-sm font-medium"
-          style={{ backgroundColor: "var(--accent)", color: "#fff" }}
-        >
-          返回首页
-        </Link>
-      </div>
-    );
-  }
-
-  const subName =
-    category?.subCategories.find((s) => s.id === tool.sub)?.name ?? null;
-  const related = (category?.tools ?? [])
-    .filter((t) => t.id !== tool.id)
-    .slice(0, 8);
 
   const h = hashCode(tool.id);
   const score = (8 + (h % 18) / 10).toFixed(1);

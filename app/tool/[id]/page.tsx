@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
-import { allTools, categories } from "@/data/tools";
+import { notFound } from "next/navigation";
+import { getCatalog } from "@/lib/toolsStore";
 import ToolDetailClient from "./ToolDetailClient";
 
 export const dynamicParams = true;
+// ISR：后台编辑/新增工具后，详情页最多 60 秒自动更新（也可被 revalidatePath 即时刷新）
+export const revalidate = 60;
 
-// 为全部工具静态预渲染（SEO：每个工具一个可收录的静态页）
-export function generateStaticParams() {
+// 预渲染全部工具（SEO：每个工具一个可收录的静态页）
+export async function generateStaticParams() {
+  const { allTools } = await getCatalog();
   return allTools.map((t) => ({ id: t.id }));
 }
 
-// 每个工具独立的标题 / 描述 / Open Graph / canonical
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
+  const { allTools, categories } = await getCatalog();
   const tool = allTools.find((t) => t.id === id);
   if (!tool) {
     return { title: "未找到工具", robots: { index: false, follow: false } };
@@ -54,62 +58,70 @@ export default async function Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { allTools, categories } = await getCatalog();
   const tool = allTools.find((t) => t.id === id);
-  const category = tool
-    ? categories.find((c) => c.tools.some((t) => t.id === tool.id))
-    : undefined;
+  if (!tool) notFound();
 
-  // 结构化数据（SoftwareApplication + 面包屑），帮助搜索引擎理解页面
+  const category = categories.find((c) => c.tools.some((t) => t.id === tool.id));
+  const subName =
+    category?.subCategories.find((s) => s.id === tool.sub)?.name ?? null;
+  const related = (category?.tools ?? [])
+    .filter((t) => t.id !== tool.id)
+    .slice(0, 8);
+
   const base = "https://tools.fanrenai.cn";
-  const jsonLd = tool
-    ? {
-        "@context": "https://schema.org",
-        "@graph": [
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        name: tool.name,
+        description: tool.description,
+        applicationCategory: category?.name ?? "AI Tool",
+        operatingSystem: "Web",
+        url: tool.url,
+        ...(tool.logo ? { image: base + tool.logo } : {}),
+        offers: { "@type": "Offer", price: "0", priceCurrency: "CNY" },
+      },
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "首页", item: base + "/" },
+          ...(category
+            ? [
+                {
+                  "@type": "ListItem",
+                  position: 2,
+                  name: category.name,
+                  item: `${base}/?cat=${category.id}`,
+                },
+              ]
+            : []),
           {
-            "@type": "SoftwareApplication",
+            "@type": "ListItem",
+            position: category ? 3 : 2,
             name: tool.name,
-            description: tool.description,
-            applicationCategory: category?.name ?? "AI Tool",
-            operatingSystem: "Web",
-            url: tool.url,
-            ...(tool.logo ? { image: base + tool.logo } : {}),
-            offers: { "@type": "Offer", price: "0", priceCurrency: "CNY" },
-          },
-          {
-            "@type": "BreadcrumbList",
-            itemListElement: [
-              { "@type": "ListItem", position: 1, name: "首页", item: base + "/" },
-              ...(category
-                ? [
-                    {
-                      "@type": "ListItem",
-                      position: 2,
-                      name: category.name,
-                      item: `${base}/?cat=${category.id}`,
-                    },
-                  ]
-                : []),
-              {
-                "@type": "ListItem",
-                position: category ? 3 : 2,
-                name: tool.name,
-                item: `${base}/tool/${tool.id}`,
-              },
-            ],
+            item: `${base}/tool/${tool.id}`,
           },
         ],
-      }
-    : null;
+      },
+    ],
+  };
 
   return (
     <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
-      <ToolDetailClient />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <ToolDetailClient
+        tool={tool}
+        categoryId={category?.id ?? null}
+        categoryName={category?.name ?? null}
+        categoryIcon={category?.icon ?? null}
+        subName={subName}
+        related={related}
+      />
     </>
   );
 }

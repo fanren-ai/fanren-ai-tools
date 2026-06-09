@@ -27,6 +27,8 @@
 
 # runtime data
 /data/*-db.json
+/data/tools-store.json
+/data/site-config.json
 
 # debug
 npm-debug.log*

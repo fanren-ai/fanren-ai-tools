@@ -1,9 +1,12 @@
 import type { MetadataRoute } from "next";
-import { allTools, categories } from "@/data/tools";
+import { getCatalog } from "@/lib/toolsStore";
 
 const BASE = "https://tools.fanrenai.cn";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export const revalidate = 3600;
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const { allTools, categories } = await getCatalog();
   const now = new Date();
 
   const staticPages: MetadataRoute.Sitemap = [
