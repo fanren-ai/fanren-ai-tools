@@ -419,8 +419,9 @@ export default function HomeClient({
             backgroundColor: "var(--background)",
           }}
         >
-          <div className="flex items-center gap-4 max-w-6xl mx-auto">
-            <div className="flex items-center gap-2 lg:hidden">
+          <div className="flex items-center gap-3 flex-wrap max-w-6xl mx-auto">
+            {/* 移动端 logo（桌面端 logo 在侧栏） */}
+            <div className="flex items-center gap-2 lg:hidden shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/logo-mark.png"
@@ -430,13 +431,33 @@ export default function HomeClient({
                 className="rounded-md shrink-0"
               />
               <span
-                className="font-bold text-sm"
+                className="font-bold text-sm whitespace-nowrap"
                 style={{ color: "var(--text-primary)" }}
               >
                 凡人修AI工具箱
               </span>
             </div>
-            <div className="flex-1 relative max-w-xl">
+
+            {/* 操作区：分享 + 收藏箱 + 主题（移动端靠右，桌面端在最右） */}
+            <div className="flex items-center gap-2 ml-auto lg:ml-0 lg:order-last shrink-0">
+              <button
+                onClick={openShare}
+                title="分享当前页面（含筛选条件）"
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 h-10 rounded-xl text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: "var(--card)",
+                  border: "1px solid var(--border)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <span>🔗</span>
+                <span className="hidden sm:inline">分享</span>
+              </button>
+              <HeaderActions />
+            </div>
+
+            {/* 搜索框：移动端独占第二行整行，桌面端居中 flex-1 */}
+            <div className="relative order-last w-full lg:order-none lg:flex-1 lg:w-auto lg:max-w-xl">
               <span
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-base"
                 style={{ color: "var(--text-secondary)" }}
@@ -456,24 +477,6 @@ export default function HomeClient({
                 }}
               />
             </div>
-
-            {/* 分享：复制链接 + 二维码 */}
-            <button
-              onClick={openShare}
-              title="分享当前页面（含筛选条件）"
-              className="shrink-0 inline-flex items-center gap-1.5 px-3 h-10 rounded-xl text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: "var(--card)",
-                border: "1px solid var(--border)",
-                color: "var(--text-secondary)",
-              }}
-            >
-              <span>🔗</span>
-              <span className="hidden sm:inline">分享</span>
-            </button>
-
-            {/* 收藏箱 + 主题切换 */}
-            <HeaderActions />
           </div>
         </header>
 
